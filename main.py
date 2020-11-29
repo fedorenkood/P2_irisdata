@@ -137,30 +137,7 @@ def decision(iris_objects, weights, names, desired_class):
 	return decided_class
 
 
-def gradient(iris_objects, weights, names, desired_output):
-	# TODO: it does not really work
-	# TODO: should I calculate 2 or 3 gradients
-	# TODO: used type of MSE
-	n_of_points = 0
-	gradient = [0, 0, 0]
-	for name in names:
-		for (x, y) in zip(iris_objects[name].petal_lengths, iris_objects[name].petal_widths):
-			n_of_points += 1
-			mse_error = line_calculation([1, x], weights) - float(y)
-			logistic_e = single_layer_output([1, x, y], weights) - desired_output[name]
-			gradient[0] += mse_error * 1
-			gradient[1] += mse_error * float(x)
-			# gradient[2] += mse_error * float(y)
-	# TODO: adjustments for the number of data_points
-	# calculating the actual step and multiplying it by the epsilon value to produce a new slope and intercept
-	epsilon = 0.1/n_of_points
-	print(f"Old Weights: {weights}")
-	for i in range(0, len(gradient)):
-		gradient[i] = (gradient[i] * 2 / n_of_points)
-		change = gradient[i] * epsilon
-		weights[i] += change
-	print(f"New Weights: {weights}")
-	return weights
+
 
 
 def main():
@@ -235,8 +212,14 @@ def main():
 	print("Error Large Error: {:.4f}".format(logistic_error(iris_objects, large_error_weights, ['green', 'blue'], {'green': float(0), 'blue': float(1)})))
 
 	# Q2e gradient
-	for i in range(0, 9):
+	print(f"Old Weights: {large_error_weights}")
+	for i in range(0, 999):
 		large_error_weights = gradient(iris_objects, large_error_weights, ['green', 'blue'], {'green': float(0), 'blue': float(1)})
+
+	print(f"New Weights: {large_error_weights}")
+	print("MSE Large Error: {:.4f}".format(mean_squared_error(iris_objects, large_error_weights, ['green', 'blue'])))
+	print("Error Large Error: {:.4f}".format(
+		logistic_error(iris_objects, large_error_weights, ['green', 'blue'], {'green': float(0), 'blue': float(1)})))
 
 	f2ax4 = fig2.add_subplot(224)
 	scatter_plot(f2ax4, iris_objects, ['green', 'blue'], "10 Gradient Steps from LE", {'x': [0.5, 3], 'y': [2.5, 7.5]})
@@ -245,7 +228,29 @@ def main():
 	plt.show()
 
 
-
+def gradient(iris_objects, weights, names, desired_output):
+	# TODO: it does not really work
+	# TODO: should I calculate 2 or 3 gradients
+	# TODO: used type of MSE
+	n_of_points = 0
+	gradient = [0, 0, 0]
+	for name in names:
+		for (x, y) in zip(iris_objects[name].petal_lengths, iris_objects[name].petal_widths):
+			n_of_points += 1
+			sigmoid = single_layer_output([1, x, y], weights)
+			mse_error = (line_calculation([1, x], weights) - float(y))
+			logistic_e = sigmoid * (1 - sigmoid)
+			gradient[0] += logistic_e * 1
+			gradient[1] += logistic_e * float(x)
+			gradient[2] += logistic_e * float(y)
+	# TODO: adjustments for the number of data_points
+	# calculating the actual step and multiplying it by the epsilon value to produce a new slope and intercept
+	epsilon = 0.1/n_of_points
+	for i in range(0, len(gradient)):
+		gradient[i] = (gradient[i] * 2 / n_of_points)
+		change = gradient[i] * epsilon
+		weights[i] += change
+	return weights
 
 
 
