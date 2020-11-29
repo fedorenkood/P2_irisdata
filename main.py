@@ -70,23 +70,25 @@ def converter(data, color_map):
 
 # this is used for 1c
 def line_calculation(inputs, weights):
-	return -(inputs[0] * weights[0] + inputs[1] * weights[1]) / weights[2]
+	# (-weights[2]) because when we say z=0, we divide by the negative of the y weight to get the equation
+	return (inputs[0] * weights[0] + inputs[1] * weights[1]) / (-weights[2])
 
 
 # inputs are of the form [width, length], weights are of the form [w0, w1, w2], and w0 is the weight for the bias node.
-def single_layer_output(inputs, weights):
-	sum = inputs[0] * weights[0] + inputs[1] * weights[1] + inputs[2] * weights[2]
-	# TODO: I multiplied it by 3 to make it look steeper
-	return logistic(sum * 3)
+def weighting_input(inputs, weights):
+	# sum = inputs[0] * weights[0] + inputs[1] * weights[1] + inputs[2] * weights[2]
+	sum = 0
+	for i in range(0, len(weights)):
+		sum += inputs[i] * weights[i]
+	return sum
 
 
-def logistic(x):
-	return 1/(math.pow(math.e, -x) + 1)
+def logistic_output(inputs, weights):
+	return 1/(math.pow(math.e, -weighting_input(inputs, weights)) + 1)
 
 
 # Calculate MSE given array of iris_objects, weights and names of objects to compare
-# error(iris_objects, weights, ['green', 'blue'])
-def mean_squared_error(iris_objects, weights, names):
+def mean_squared_error(iris_objects, weights, names, desired_output):
 	# Computing the difference between the expected and observed data point
 	n_of_points = 0
 	error_sum = 0
@@ -94,7 +96,7 @@ def mean_squared_error(iris_objects, weights, names):
 	for name in names:
 		for (x, y) in zip(iris_objects[name].petal_lengths, iris_objects[name].petal_widths):
 			n_of_points += 1
-			difference = line_calculation([1, x], weights) - float(y)
+			difference = weighting_input([1, x, y], weights) #- desired_output[name]
 			error_sum += math.pow(difference, 2)
 
 	# Dividing by the number of data points
@@ -112,7 +114,7 @@ def logistic_error(iris_objects, weights, names, desired_output):
 	for name in names:
 		for (x, y) in zip(iris_objects[name].petal_lengths, iris_objects[name].petal_widths):
 			n_of_points += 1
-			difference = single_layer_output([1, x, y], weights) - desired_output[name]
+			difference = logistic_output([1, x, y], weights) - desired_output[name]
 			error_sum = error_sum + math.pow(difference, 2)
 
 	# TODO: Dividing by the number of data points?
@@ -120,14 +122,14 @@ def logistic_error(iris_objects, weights, names, desired_output):
 	return error
 
 
-# Uses original data to classify by the given names and single_layer_output
+# Uses original data to classify by the given names and logistic_output
 # decision(iris_objects, weights, ['green', 'blue'], {'0' : 'green', '1' : 'blue'})
 def decision(iris_objects, weights, names, desired_class):
 	decided_class = {names[0]: Iris(names[0], [], []), names[1]: Iris(names[1], [], [])}
 
 	for name in names:
 		for (x, y) in zip(iris_objects[name].petal_lengths, iris_objects[name].petal_widths):
-			if single_layer_output([1, x, y], weights) > 0.5:
+			if logistic_output([1, x, y], weights) > 0.5:
 				decided_class[desired_class['1']].petal_lengths.append(x)
 				decided_class[desired_class['1']].petal_widths.append(y)
 			else:
@@ -146,7 +148,7 @@ def main():
 	iris_objects = converter(data, color_map)
 
 	# General Legend
-	weights = [-3.3, 0.35, 1]  # These separate the two important things nicely
+	weights = [-10, 1.2, 3]  # These separate the two important things nicely
 
 	# 1st Figure
 	# TODO: set titles
@@ -173,7 +175,7 @@ def main():
 	for x in range(0, n):
 		graph_outputs.append([])
 		for y in range(0, n):
-			graph_outputs[x].append(single_layer_output([1, x_axis[x][y], y_axis[x][y]], weights))
+			graph_outputs[x].append(logistic_output([1, x_axis[x][y], y_axis[x][y]], weights))
 	graph_outputs = np.array(graph_outputs)
 
 	ax3.set_zlim([0, 1])
@@ -206,20 +208,18 @@ def main():
 	line_plot(f2ax3, large_error_weights, [1, 7.5])
 
 	# TODO: not sure what error to use
-	print("MSE Small Error: {:.4f}".format(mean_squared_error(iris_objects, weights, ['green', 'blue'])))
-	print("Error Small Error: {:.4f}".format(logistic_error(iris_objects, weights, ['green', 'blue'], {'green': float(0), 'blue': float(1)})))
-	print("MSE Large Error: {:.4f}".format(mean_squared_error(iris_objects, large_error_weights, ['green', 'blue'])))
-	print("Error Large Error: {:.4f}".format(logistic_error(iris_objects, large_error_weights, ['green', 'blue'], {'green': float(0), 'blue': float(1)})))
+	names = ['green', 'blue']
+	desired_output = {'green': float(0), 'blue': float(1)}
+	print("Small Error: {:.4f}".format(logistic_error(iris_objects, weights, names, desired_output)))
+	print("Large Error: {:.4f}".format(logistic_error(iris_objects, large_error_weights, names, desired_output)))
 
 	# Q2e gradient
 	print(f"Old Weights: {large_error_weights}")
-	for i in range(0, 999):
-		large_error_weights = gradient(iris_objects, large_error_weights, ['green', 'blue'], {'green': float(0), 'blue': float(1)})
+	for i in range(0, 20000):
+		large_error_weights = gradient(iris_objects, large_error_weights, names, desired_output)
 
 	print(f"New Weights: {large_error_weights}")
-	print("MSE Large Error: {:.4f}".format(mean_squared_error(iris_objects, large_error_weights, ['green', 'blue'])))
-	print("Error Large Error: {:.4f}".format(
-		logistic_error(iris_objects, large_error_weights, ['green', 'blue'], {'green': float(0), 'blue': float(1)})))
+	print("Large Error: {:.4f}".format(logistic_error(iris_objects, large_error_weights, names, desired_output)))
 
 	f2ax4 = fig2.add_subplot(224)
 	scatter_plot(f2ax4, iris_objects, ['green', 'blue'], "10 Gradient Steps from LE", {'x': [0.5, 3], 'y': [2.5, 7.5]})
@@ -237,10 +237,10 @@ def gradient(iris_objects, weights, names, desired_output):
 	for name in names:
 		for (x, y) in zip(iris_objects[name].petal_lengths, iris_objects[name].petal_widths):
 			n_of_points += 1
-			sigmoid = single_layer_output([1, x, y], weights)
+			sigmoid = logistic_output([1, x, y], weights)
 			mse_error = (line_calculation([1, x], weights) - float(y))
-			logistic_e = sigmoid * (1 - sigmoid)
-			gradient[0] += logistic_e * 1
+			logistic_e = (sigmoid - desired_output[name]) * sigmoid * (1 - sigmoid)
+			gradient[0] += logistic_e * (1)
 			gradient[1] += logistic_e * float(x)
 			gradient[2] += logistic_e * float(y)
 	# TODO: adjustments for the number of data_points
@@ -249,7 +249,7 @@ def gradient(iris_objects, weights, names, desired_output):
 	for i in range(0, len(gradient)):
 		gradient[i] = (gradient[i] * 2 / n_of_points)
 		change = gradient[i] * epsilon
-		weights[i] += change
+		weights[i] -= change
 	return weights
 
 
