@@ -26,7 +26,32 @@ def read_file(name):
 	return data
 
 
-def classification(data, color_map):
+# Names are color coded
+def scatter_plot(plot, iris_objects, names, title, limits):
+	red_patch = mpatches.Patch(color='red', label='Setosa')
+	blue_patch = mpatches.Patch(color='blue', label='Virginica')
+	green_patch = mpatches.Patch(color='green', label='Versicolor')
+
+	for name in names:
+		plot.scatter(iris_objects[name].petal_lengths, iris_objects[name].petal_widths, c=name, alpha=0.5)
+	plot.legend(handles=[green_patch, blue_patch], loc='upper left')
+	plot.set_ylim(limits['x'])
+	plot.set_xlim(limits['y'])
+	plot.set_title(title)
+	plot.set_ylabel('Petal Width')
+	plot.set_xlabel('Petal Length')
+	plot.grid(True)
+
+
+def line_plot(plot, weights, domain):
+	line_lengths = np.linspace(domain, 100)
+	line_widths = []
+	for i in range(len(line_lengths)):
+		line_widths.append(line_calculation([1, line_lengths[i]], weights))
+	plot.plot(line_lengths, line_widths, 'r')
+
+
+def converter(data, color_map):
 	# to make it more general, color coding can be removed
 	flower_types = set()
 	for row in data:
@@ -45,7 +70,7 @@ def classification(data, color_map):
 
 # this is used for 1c
 def line_calculation(inputs, weights):
-	return -(inputs[0] * weights[0] + inputs[1] * weights[1])
+	return -(inputs[0] * weights[0] + inputs[1] * weights[1]) / weights[2]
 
 
 # inputs are of the form [width, length], weights are of the form [w0, w1, w2], and w0 is the weight for the bias node.
@@ -69,8 +94,8 @@ def mean_squared_error(iris_objects, weights, names):
 	for name in names:
 		for (x, y) in zip(iris_objects[name].petal_lengths, iris_objects[name].petal_widths):
 			n_of_points += 1
-			difference = line_calculation([x, y], weights) - float(y)
-			error_sum = error_sum + math.pow(difference, 2)
+			difference = line_calculation([1, x], weights) - float(y)
+			error_sum += math.pow(difference, 2)
 
 	# Dividing by the number of data points
 	error = error_sum / n_of_points
@@ -79,16 +104,18 @@ def mean_squared_error(iris_objects, weights, names):
 
 # Calculate Error given array of iris_objects, weights and names of objects to compare
 # error(iris_objects, weights, ['green', 'blue'], {'green' : float(0), 'blue' : float(1)})
-def error(iris_objects, weights, names, desired_output):
+def logistic_error(iris_objects, weights, names, desired_output):
 	# Computing the difference between the expected and observed data point
 	error_sum = 0
+	n_of_points = 0
 
 	for name in names:
 		for (x, y) in zip(iris_objects[name].petal_lengths, iris_objects[name].petal_widths):
+			n_of_points += 1
 			difference = single_layer_output([1, x, y], weights) - desired_output[name]
 			error_sum = error_sum + math.pow(difference, 2)
 
-	# Dividing by the number of data points
+	# TODO: Dividing by the number of data points?
 	error = error_sum / 2
 	return error
 
@@ -110,67 +137,53 @@ def decision(iris_objects, weights, names, desired_class):
 	return decided_class
 
 
-def scatter_plot(plot, iris_objects, names):
+def gradient(iris_objects, weights, names, desired_output):
+	# TODO: it does not really work
+	# TODO: should I calculate 2 or 3 gradients
+	# TODO: used type of MSE
+	n_of_points = 0
+	gradient = [0, 0, 0]
 	for name in names:
-		plot.scatter(iris_objects[name].petal_lengths, iris_objects[name].petal_widths, c=name, alpha=0.5)
+		for (x, y) in zip(iris_objects[name].petal_lengths, iris_objects[name].petal_widths):
+			n_of_points += 1
+			mse_error = line_calculation([1, x], weights) - float(y)
+			logistic_e = single_layer_output([1, x, y], weights) - desired_output[name]
+			gradient[0] += mse_error * 1
+			gradient[1] += mse_error * float(x)
+			# gradient[2] += mse_error * float(y)
+	# TODO: adjustments for the number of data_points
+	# calculating the actual step and multiplying it by the epsilon value to produce a new slope and intercept
+	epsilon = 0.1/n_of_points
+	print(f"Old Weights: {weights}")
+	for i in range(0, len(gradient)):
+		gradient[i] = (gradient[i] * 2 / n_of_points)
+		change = gradient[i] * epsilon
+		weights[i] += change
+	print(f"New Weights: {weights}")
+	return weights
 
 
 def main():
 	data = read_file('irisdata.csv')
 	color_map = {"virginica": "blue", "versicolor": "green", "setosa": "red"}
-	iris_objects = classification(data, color_map)
+	iris_objects = converter(data, color_map)
 
 	# General Legend
-	red_patch = mpatches.Patch(color='red', label='Setosa')
-	blue_patch = mpatches.Patch(color='blue', label='Virginica')
-	green_patch = mpatches.Patch(color='green', label='Versicolor')
 	weights = [-3.3, 0.35, 1]  # These separate the two important things nicely
-	large_error_weights = [-1.3, 0.25, 1]
 
 	# 1st Figure
 	# TODO: set titles
 	fig1 = plt.figure(1, figsize=(8, 6))
-	fig1.subplots_adjust(hspace=0.3)
-	ax12 = fig1.add_subplot(211)
+	fig1.subplots_adjust(hspace=0.35)
 
 	# plots for Q1
 	# Q1a
-	ax1 = fig1.add_subplot(221, sharey=ax12, sharex=ax12)
-	ax1.scatter(iris_objects['green'].petal_lengths, iris_objects['green'].petal_widths, c='green', alpha=0.5)
-	ax1.scatter(iris_objects['blue'].petal_lengths, iris_objects['blue'].petal_widths, c='blue', alpha=0.5)
+	scatter_plot(fig1.add_subplot(221), iris_objects, ['green', 'blue'], "Iris data", {'x': [0.5, 3], 'y': [2.5, 7.5]})
 
-	# Q1c
-	# Defining Boundary Line
-	line_lengths = np.linspace(1, 7.5, 100)
-	line_widths = []
-	for i in range(len(line_lengths)):
-		line_widths.append(line_calculation([1, line_lengths[i]], weights))
-
-	# Plot of line vs scatter
-	ax2 = fig1.add_subplot(222, sharey=ax12, sharex=ax12)
-	ax2.scatter(iris_objects['green'].petal_lengths, iris_objects['green'].petal_widths, c='green', alpha=0.5)
-	ax2.scatter(iris_objects['blue'].petal_lengths, iris_objects['blue'].petal_widths, c='blue', alpha=0.5)
-	ax2.plot(line_lengths, line_widths, 'r')
-
-	# Common Labels
-	# Turn off axis lines and ticks of the big subplot
-	ax12.spines['top'].set_color('none')
-	ax12.spines['bottom'].set_color('none')
-	ax12.spines['left'].set_color('none')
-	ax12.spines['right'].set_color('none')
-	ax12.tick_params(labelcolor='w', top=False, bottom=False, left=False, right=False)
-	ax12.set_ylabel('Petal Width')
-	ax12.set_xlabel('Petal Length')
-	ax12.set_ylim([0.5, 3])
-	ax12.set_xlim([2.5, 7.5])
-
-	# Legends
-	ax1.legend(handles=[green_patch, blue_patch], loc='upper left')
-	ax2.legend(handles=[green_patch, blue_patch], loc='upper left')
-	ax1.set_title("Iris data")
-	ax2.set_title("Decision Boundary")
-	ax1.grid(True)
-	ax2.grid(True)
+	# Q1c: Plot of line vs scatter
+	f1ax2 = fig1.add_subplot(222)
+	scatter_plot(f1ax2, iris_objects, ['green', 'blue'], "Decision Boundary", {'x': [0.5, 3], 'y': [2.5, 7.5]})
+	line_plot(f1ax2, weights, [1, 7.5])
 
 	# TODO: Q1d graph
 	ax3 = fig1.add_subplot(223, projection='3d')
@@ -194,27 +207,44 @@ def main():
 
 	# Q1e graph
 	decided_classes = decision(iris_objects, weights, ['green', 'blue'], {'0': 'green', '1': 'blue'})
-	ax4 = fig1.add_subplot(224)
-	ax4.scatter(decided_classes['green'].petal_lengths, decided_classes['green'].petal_widths, c='green', alpha=0.5)
-	ax4.scatter(decided_classes['blue'].petal_lengths, decided_classes['blue'].petal_widths, c='blue', alpha=0.5)
-	ax4.plot(line_lengths, line_widths, 'r')
-
-	ax4.set_ylabel('Petal Width')
-	ax4.set_xlabel('Petal Length')
-	ax4.set_title('Classifier')
-	ax4.set_ylim([0.5, 3])
-	ax4.set_xlim([2.5, 7.5])
-	ax4.legend(handles=[green_patch, blue_patch], loc='upper left')
-	ax4.grid(True)
+	f1ax4 = fig1.add_subplot(224)
+	scatter_plot(f1ax4, decided_classes, ['green', 'blue'], "Classifier", {'x': [0.5, 3], 'y': [2.5, 7.5]})
+	line_plot(f1ax4, weights, [1, 7.5])
 
 	# Q2b
 	fig2 = plt.figure(2, figsize=(8, 6))
+	fig2.subplots_adjust(hspace=0.35)
+	scatter_plot(fig2.add_subplot(221), iris_objects, ['green', 'blue'], "Iris data", {'x': [0.5, 3], 'y': [2.5, 7.5]})
 
+	# classified with small error weights
+	f2ax2 = fig2.add_subplot(222)
+	scatter_plot(f2ax2, decided_classes, ['green', 'blue'], "Small Error Classification", {'x': [0.5, 3], 'y': [2.5, 7.5]})
+	line_plot(f2ax2, weights, [1, 7.5])
+
+	# classified with large error weights
+	large_error_weights = [-2.3, 0.25, 1]
+	le_decided_classes = decision(iris_objects, large_error_weights, ['green', 'blue'], {'0': 'green', '1': 'blue'})
+	f2ax3 = fig2.add_subplot(223)
+	scatter_plot(f2ax3, le_decided_classes, ['green', 'blue'], "Large Error Classification", {'x': [0.5, 3], 'y': [2.5, 7.5]})
+	line_plot(f2ax3, large_error_weights, [1, 7.5])
+
+	# TODO: not sure what error to use
+	print("MSE Small Error: {:.4f}".format(mean_squared_error(iris_objects, weights, ['green', 'blue'])))
+	print("Error Small Error: {:.4f}".format(logistic_error(iris_objects, weights, ['green', 'blue'], {'green': float(0), 'blue': float(1)})))
+	print("MSE Large Error: {:.4f}".format(mean_squared_error(iris_objects, large_error_weights, ['green', 'blue'])))
+	print("Error Large Error: {:.4f}".format(logistic_error(iris_objects, large_error_weights, ['green', 'blue'], {'green': float(0), 'blue': float(1)})))
+
+	# Q2e gradient
+	for i in range(0, 9):
+		large_error_weights = gradient(iris_objects, large_error_weights, ['green', 'blue'], {'green': float(0), 'blue': float(1)})
+
+	f2ax4 = fig2.add_subplot(224)
+	scatter_plot(f2ax4, iris_objects, ['green', 'blue'], "10 Gradient Steps from LE", {'x': [0.5, 3], 'y': [2.5, 7.5]})
+	line_plot(f2ax4, large_error_weights, [1, 7.5])
 	# Actually graphing it
 	plt.show()
 
-	print("MSE: {:.4f}".format(mean_squared_error(iris_objects, weights, ['green', 'blue'])))
-	print("Error: {:.4f}".format(error(iris_objects, weights, ['green', 'blue'], {'green' : float(0), 'blue' : float(1)})))
+
 
 
 
