@@ -117,8 +117,8 @@ def logistic_error(iris_objects, weights, names, desired_output):
 			difference = logistic_output([1, x, y], weights) - desired_output[name]
 			error_sum = error_sum + math.pow(difference, 2)
 
-	# TODO: Dividing by the number of data points?
-	error = error_sum / 2
+	# Dividing by the number of data points
+	error = error_sum / n_of_points
 	return error
 
 
@@ -151,7 +151,6 @@ def main():
 	weights = [-10, 1.2, 3]  # These separate the two important things nicely
 
 	# 1st Figure
-	# TODO: set titles
 	fig1 = plt.figure(1, figsize=(8, 6))
 	fig1.subplots_adjust(hspace=0.35)
 
@@ -164,7 +163,7 @@ def main():
 	scatter_plot(f1ax2, iris_objects, ['green', 'blue'], "Decision Boundary", {'x': [0.5, 3], 'y': [2.5, 7.5]})
 	line_plot(f1ax2, weights, [1, 7.5])
 
-	# TODO: Q1d graph
+	# Q1d graph
 	ax3 = fig1.add_subplot(223, projection='3d')
 
 	n = 100
@@ -207,7 +206,6 @@ def main():
 	scatter_plot(f2ax3, le_decided_classes, ['green', 'blue'], "Large Error Classification", {'x': [0.5, 3], 'y': [2.5, 7.5]})
 	line_plot(f2ax3, large_error_weights, [1, 7.5])
 
-	# TODO: not sure what error to use
 	names = ['green', 'blue']
 	desired_output = {'green': float(0), 'blue': float(1)}
 	print("Small Error: {:.4f}".format(logistic_error(iris_objects, weights, names, desired_output)))
@@ -215,7 +213,7 @@ def main():
 
 	# Q2e gradient
 	print(f"Old Weights: {large_error_weights}")
-	for i in range(0, 20000):
+	for i in range(0, 10000):
 		large_error_weights = gradient(iris_objects, large_error_weights, names, desired_output)
 
 	print(f"New Weights: {large_error_weights}")
@@ -229,26 +227,23 @@ def main():
 
 
 def gradient(iris_objects, weights, names, desired_output):
-	# TODO: it does not really work
-	# TODO: should I calculate 2 or 3 gradients
-	# TODO: used type of MSE
 	n_of_points = 0
 	gradient = [0, 0, 0]
 	for name in names:
 		for (x, y) in zip(iris_objects[name].petal_lengths, iris_objects[name].petal_widths):
 			n_of_points += 1
 			sigmoid = logistic_output([1, x, y], weights)
-			mse_error = (line_calculation([1, x], weights) - float(y))
 			logistic_e = (sigmoid - desired_output[name]) * sigmoid * (1 - sigmoid)
-			gradient[0] += logistic_e * (1)
+			gradient[0] += logistic_e * 1
 			gradient[1] += logistic_e * float(x)
 			gradient[2] += logistic_e * float(y)
-	# TODO: adjustments for the number of data_points
 	# calculating the actual step and multiplying it by the epsilon value to produce a new slope and intercept
-	epsilon = 0.1/n_of_points
+	# 3 is a nice step size
+	epsilon = 3
 	for i in range(0, len(gradient)):
-		gradient[i] = (gradient[i] * 2 / n_of_points)
+		gradient[i] = (gradient[i] * 2)/n_of_points
 		change = gradient[i] * epsilon
+		# we subtract the gradient because it is a descent function
 		weights[i] -= change
 	return weights
 
